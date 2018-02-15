@@ -1,0 +1,39 @@
+config:
+  private_key: /etc/keys/private.pem
+  public_key: /etc/keys/public.pem
+
+databases:
+  dev-db01:
+    engine: mysql
+    storage:
+      - type: s3
+        bucket: backup-bucket
+        path: backups
+        region: eu-west-1
+    host: dev-db01.example.com
+    database: dev_db01
+    user: backup
+    password: fwPUwUGubT219lekFNYgPU4Sx5148udiaxIEXEwrpn6WzTtG+2dE3cLYsi2gm7HE1EIq5vxJ5bKuu77oGl6WVjSNgVew5CZ9BW2iR9YzIAcUvpB1P37CiBaizMtdQ4z5/rqNytybwf8ZhoOt2RGYznxKOPSR0ul1hl782JOwPzuLn+H+n2EO44//xq13fc1veS/1DhU+uQjZkjBre2Vq3a57roS24JAaJKywSGZ9T9GMUpQ2EjCuJ0YNi2euevHiFzltxRNI2RZQ/7F9pnHSoTakwgz5mIfN1kIsDmsu34HvOe18vCT8vswGSQ4xx7g6G3vza1mxG/Ctnj+j0KBvDg==
+
+  dev-db02:
+    engine: postgresql
+    storage:
+      - type: local
+        path: /tmp/backups
+    host: dev-db02.wuaki.org
+    database: dev_db02
+    user: backup
+    password: My9HRnKXByWroR4EBwgoHCMK6r5H0jaC2J31F7jrCS9N1nmqH286JjeaDkCtoCWUJ33qfDtu5BOGEj9KqWV9kJDHNzCgtAqjCORe1x7TWec7jAmuUheyogwgMNpvCQXE2K7C6mXpjjVo13RYhg2XOz4Hcpt3OIk6flHFTqi32wjrDaLQCbBIcFhCVVNUfhjqeWXYmV3+wES8FZGfkqTzythaIpoOBODZc7q7dRucyu6Ur04ToVZ4fwNjkyov/lD3kwFqzQ8qb4xEJYujT4G3gGrX31yczRhpyIj889NcB57IQtZxi283UbMKnDsT6uK43guSMP1xhX+YtVnUpPDqbA==
+
+  dev-db03:
+    engine: mysql
+    storage:
+      - type: ssh
+        server: 172.20.209.168
+        user: deploy
+        key_file: /home/deploy/.ssh/id_rsa.pub
+        path: /mnt/backups
+    host: dev-db03.wuaki.org
+    database: dev_db03
+    user: admin
+    password: YijkO4uOh+hdrB0KF7PiXIY/YvXK+fRj0jdYacupUp2cWXN45MXQy69EQ3a/oqkh38exT2akb3tba7eJ9ZHDaYdl6bsXocL/8TwkcRV2ylDluFs67+CkTiQ79TnksA1agdDlqAhIOJpnjdnh4HNT9Ww1e20P0WSunOggUHs92+P5bm7mEz5RARktRy79wtvVQJvXgwb25EtSZopvKd5Iub4FJLfpfBkzwidK9ViDlAoQxctlNW+JI1TGcp2N6tqSUqfpelSG9+nDUtPdwJ566ZvuVe6M2Z0xqWXNQeKvemKSzIXHzreT/j5li7U6itZVpX5PlWfNk9TYUqD8f0x5gA==

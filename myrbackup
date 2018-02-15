@@ -1,0 +1,127 @@
+#!/usr/bin/env ruby
+
+require 'yaml'
+require 'aws-sdk-s3'
+require 'fileutils'
+require 'net/sftp'
+require 'logger'
+require 'openssl'
+require 'base64'
+
+option = ARGV[0]
+config_file = "/etc/myrbackup/config.yaml"
+log_file = "/var/log/myrbackup.log"
+
+@log = Logger.new("#{log_file}")
+
+def checkDependencies(config_file,log_file)
+  if not File.exist?(config_file)
+    abort("Couldn't find configuration file /etc/myrbackup/config.yaml. Please, create it.")
+  elsif not File.exist?(log_file)
+    File.new("#{log_file}", "")
+  end
+end
+
+def readConfig(config_file)
+  config = YAML.load(File.read(config_file))
+  config['database'].each do |a,i| key = a, value = i
+    engine = config['database'][a]['engine']
+    host = config['database'][a]['host']
+    database = config['database'][a]['database']
+    user = config['database'][a]['user']
+    encrypted_password = config['database'][a]['password']
+    config['database'][a]['storage'].each do |storage_type|
+      type = storage_type['type']
+      if (type == 's3')
+        bucket = storage_type['bucket']
+        path = storage_type['path']
+        region = storage_type['region']
+        doBackup(engine,host,database,user,encrypted_password,type,bucket,path,region,'',config_file)
+      elsif (type == 'local')
+        path = storage_type['path']
+        doBackup(engine,host,database,user,encrypted_password,type,path,'','','',config_file)
+      elsif (type == 'ssh')
+        ssh_server = storage_type['server']
+        ssh_user = storage_type['user']
+        ssh_path = storage_type['path']
+        ssh_key_file = storage_type['key_file']
+        doBackup(engine,host,database,user,encrypted_password,type,ssh_path,ssh_server,ssh_user,ssh_key_file,config_file)
+      end
+    end
+  end
+end
+
+def storeBackup(backup_name,type,type_value1,type_value2,type_value3,type_value4)
+  if (type == 's3')
+    @log.debug "[INFO] Storing #{backup_name} in S3"
+    if (type_value2 == "/")
+      object_name = backup_name
+    else
+      object_name = "#{type_value2}/#{backup_name}"
+    end
+    s3 = Aws::S3::Resource.new(region: "#{type_value3}")
+    obj = s3.bucket("#{type_value1}").object(object_name)
+    obj.upload_file("/tmp/#{backup_name}")
+  elsif (type == 'local')
+    @log.debug "[INFO] Storing #{backup_name} in locally"
+    FileUtils.mv("/tmp/#{backup_name}", "#{type_value1}/#{backup_name}")
+  elsif (type == 'ssh')
+    @log.debug "[INFO] Copying #{backup_name} via SSH"
+    ssh_user = type_value3
+    ssh_server = type_value2
+    ssh_path = type_value1
+    ssh_key_file = type_value4
+    Net::SFTP.start(ssh_server, "#{ssh_user}", :keys=>[ssh_key_file]) do |sftp|
+      sftp.upload!("/tmp/#{backup_name}", "#{ssh_path}/#{backup_name}")
+    end
+  else
+    @log.error '[ERROR] Invalid storage. Check your configuration file'
+  end
+end
+
+def doBackup(engine,host,database,user,encrypted_password,type,type_value1,type_value2,type_value3,type_value4,config_file)
+  timestamp = Time.now.strftime('%d%m%Y%H%M%S')
+  backup_name = "#{database}-#{timestamp}.bz2"
+  password = decryptString(encrypted_password,config_file)
+  if (engine == "mysql")
+    system("mysqldump --add-drop-table -h #{host} -u #{user} -p#{password} #{database} | bzip2 -c > /tmp/#{backup_name}")
+  elsif (engine == "postgresql")
+    pg_info = File.new(ENV['HOME']+'/.pgpass', 'w')
+    pg_info.puts("#{host}:5432:#{database}:#{user}:#{password}")
+    pg_info.close
+    File.chmod(0600, ENV['HOME']+'/.pgpass')
+    system("pg_dump -U #{user} -h #{host} -Fc #{database} | bzip2 -c > /tmp/#{backup_name}")
+    File.delete(ENV['HOME']+'/.pgpass')
+  end
+  storeBackup(backup_name,type,type_value1,type_value2,type_value3,type_value4)
+end
+
+def encryptString(string,config_file)
+  config = YAML.load(File.read(config_file))
+  public_key_file = config['config']['public_key']
+  public_key = OpenSSL::PKey::RSA.new(File.read(public_key_file))
+  encrypted_string = Base64.strict_encode64(public_key.public_encrypt(string))
+  encrypted_string
+end
+
+def decryptString(encrypted_string,config_file)
+  config = YAML.load(File.read(config_file))
+  private_key_file = config['config']['private_key']
+  private_key = OpenSSL::PKey::RSA.new(File.read(private_key_file))
+  string = private_key.private_decrypt(Base64.decode64(encrypted_string))
+  string
+end
+
+case option
+when "-e"
+  string = ARGV[1]
+  @log.debug "[INFO] Encrypting string"
+  puts encryptString(string,config_file)
+when "-d"
+  encrypted_string = ARGV[1]
+  @log.debug "[INFO] Decrypting key"
+  puts decryptString(encrypted_string,config_file)
+else
+  checkDependencies(config_file,log_file)
+  readConfig(config_file)
+end
