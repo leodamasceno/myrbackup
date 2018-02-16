@@ -23,7 +23,7 @@ You may have issues running the application when the storage type SSH is specifi
     export LANGUAGE=en_US.UTF-8
     export LC_ALL=en_US.UTF-8
 
-### AWS configuration
+### AWS configuration
 Set the environment variables from AWS to use the S3 storage type. You can do that by either creating the file */var/root/.aws/credentials* manually or simply executing the aws CLI:
 
     aws configure
